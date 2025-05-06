@@ -1,0 +1,37 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const db = require('../config/db'); 
+
+router.post('/', async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ message: 'Token and password are required.' });
+  }
+
+  try {
+    const [user] = await db.query(
+      'SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > ?',
+      [token, Date.now()]
+    );
+
+    if (user.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await db.query('UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?', [
+      hashedPassword,
+      user[0].id,
+    ]);
+
+    res.status(200).json({ message: 'Password reset successful.' });
+  } catch (error) {
+    console.error('Error in reset-password:', error);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+module.exports = router;

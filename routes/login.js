@@ -1,29 +1,38 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); // Adjust if your DB setup is in another file
+const db = require('../config/db'); 
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-router.post('/', async (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(422).json({ message: 'Email and password are required.' });
+  }
+
   try {
-    const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
 
-    if (users.length === 0) {
-      return res.status(400).json({ message: 'Invalid email or password' });
+    const [user] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (user.length === 0) {
+      return res.status(404).json({ message: 'User not registered.' });
     }
 
-    const user = users[0];
-    const match = await bcrypt.compare(password, user.password);
-
-    if (!match) {
-      return res.status(400).json({ message: 'Invalid email or password' });
+    const isPasswordValid = await bcrypt.compare(password, user[0].password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Invalid email or password.' });
     }
 
-    res.json({ message: 'Login successful', user_id: user.id });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Server error during login' });
+    const token = jwt.sign({ id: user[0].id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(200).json({
+      token,
+      user_id: user[0].id,
+      onboarding_completed: user[0].onboarding_completed, 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error.' });
   }
 });
 
