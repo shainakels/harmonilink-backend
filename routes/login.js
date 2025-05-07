@@ -12,7 +12,6 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-
     const [user] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     if (user.length === 0) {
       return res.status(404).json({ message: 'User not registered.' });
@@ -28,7 +27,7 @@ router.post('/login', async (req, res) => {
     res.status(200).json({
       token,
       user_id: user[0].id,
-      onboarding_completed: user[0].onboarding_completed, 
+      onboarding_completed: user[0].onboarding_completed,
     });
   } catch (error) {
     console.error(error);

@@ -5,6 +5,19 @@ const db = require('../config/db');
 const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+
+// Middleware to verify JWT
+function authenticateToken(req, res, next) {
+  const token = req.headers['authorization']?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Access token required.' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Invalid or expired token.' });
+    req.user = user; // Attach user info to the request
+    next();
+  });
+}
 
 router.post('/signup', [
   body('name').notEmpty().withMessage('Username is required'),
@@ -153,6 +166,20 @@ router.post('/forgot-password', async (req, res) => {
   } catch (error) {
     console.error('Error in forgot-password:', error);
     res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+// Fetch current user profile
+router.get('/current-user', authenticateToken, async (req, res) => {
+  try {
+    const [user] = await db.query('SELECT * FROM user_profiles WHERE id = ?', [req.user.id]);
+    if (!user || user.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    res.status(200).json(user[0]);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Failed to fetch user profile.' });
   }
 });
 
