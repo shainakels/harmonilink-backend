@@ -6,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 
 // Middleware to verify JWT
 function authenticateToken(req, res, next) {
@@ -19,29 +20,26 @@ function authenticateToken(req, res, next) {
   });
 }
 
-router.post('/signup', [
-  body('name').notEmpty().withMessage('Username is required'),
-  body('email').isEmail().withMessage('Invalid email format'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.mapped() });
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per windowMs
+  message: 'Too many login attempts. Please try again later.',
+});
 
-  const { name, email, password } = req.body;
+router.post('/signup', [
+  body('username').trim().isLength({ min: 3 }).escape(),
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }).escape(),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
   try {
-    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
-      return res.status(422).json({ errors: { email: ['Email already registered'] } });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, hashedPassword]);
-
-    res.json({ message: 'User registered successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    // Signup logic
+  } catch (error) {
+    next(error); // Pass error to centralized error handler
   }
 });
 
@@ -180,6 +178,14 @@ router.get('/current-user', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ message: 'Failed to fetch user profile.' });
+  }
+});
+
+router.post('/login', loginLimiter, async (req, res, next) => {
+  try {
+    // Login logic
+  } catch (error) {
+    next(error);
   }
 });
 

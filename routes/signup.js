@@ -3,16 +3,26 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../config/db'); 
 const { body, validationResult } = require('express-validator');
+const axios = require('axios');
 
-const validatePasswordStrength = (password) => {
-  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  return regex.test(password);
-};
+router.post('/signup', [
+  body('username').trim().escape(),
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }).escape(),
+], async (req, res) => {
+  const { username, email, password, recaptchaResponse } = req.body;
 
-router.post('/signup', async (req, res) => {
-  const { username, email, password } = req.body;
+  // Verify reCAPTCHA
+  const secretKey = '6LeSaTIrAAAAALLD-cSjuLjZqKZnfifJl_RedkF6'; // Replace with your secret key
+  const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaResponse}`;
 
   try {
+    const { data } = await axios.post(verificationUrl);
+    if (!data.success) {
+      return res.status(400).json({ message: 'reCAPTCHA verification failed.' });
+    }
+
+    // Check if username or email already exists
     const [existingUser] = await db.query(
       'SELECT * FROM users WHERE username = ? OR email = ?',
       [username, email]
@@ -28,20 +38,18 @@ router.post('/signup', async (req, res) => {
       });
     }
 
+    // Hash the password and save the user
     const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await db.query(
-      'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-      [username, email, hashedPassword]
-    );
+    await db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [
+      username,
+      email,
+      hashedPassword,
+    ]);
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user_id: result.insertId,
-      onboarding_completed: false, 
-    });
+    res.status(201).json({ message: 'Signup successful!' });
   } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ message: 'Server error.' });
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred during signup.' });
   }
 });
 

@@ -1,10 +1,19 @@
 const express = require('express');
+const { body, validationResult } = require('express-validator');
 const router = express.Router();
 const db = require('../config/db'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-router.post('/login', async (req, res) => {
+router.post('/login', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').escape(),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -30,8 +39,7 @@ router.post('/login', async (req, res) => {
       onboarding_completed: user[0].onboarding_completed,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error.' });
+    next(error);
   }
 });
 
