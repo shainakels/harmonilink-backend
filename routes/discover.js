@@ -2,8 +2,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const jwt = require('jsonwebtoken');
-const NodeCache = require('node-cache');
-const cache = new NodeCache();
 
 // Middleware to verify JWT
 function authenticateToken(req, res, next) {
@@ -20,12 +18,11 @@ function authenticateToken(req, res, next) {
 // Discover endpoint
 router.get('/discover', authenticateToken, async (req, res) => {
   try {
-    // Fetch profiles including mixtapes and songs
-    const [profiles] = await db.query(`
+    const [rows] = await db.execute(
+      `
       SELECT 
         users.username,
         user_profiles.gender,
-        user_profiles.bio AS profile_bio,
         user_profiles.birthday,
         user_profiles.user_id,
         mixtapes.id AS mixtape_id,
@@ -38,12 +35,21 @@ router.get('/discover', authenticateToken, async (req, res) => {
       INNER JOIN users ON user_profiles.user_id = users.id
       LEFT JOIN mixtapes ON user_profiles.user_id = mixtapes.user_id
       LEFT JOIN mixtape_songs ON mixtapes.id = mixtape_songs.mixtape_id
-      WHERE users.id != ?
+      WHERE users.id != ? 
+        AND users.id NOT IN (
+          SELECT discarded_user_id 
+          FROM discarded 
+          WHERE user_id = ?
+        )
       GROUP BY users.id, mixtapes.id
-    `, [req.user.id]);
+      ORDER BY RAND()
+      LIMIT 10
+      `,
+      [req.user.id, req.user.id]
+    );
 
-    // Process profiles to include age and structured mixtape details
-    const profileWithDetails = profiles.map((profile) => {
+    // Structure the response
+    const profileWithDetails = rows.map((profile) => {
       const age = profile.birthday
         ? Math.floor((new Date() - new Date(profile.birthday)) / (365.25 * 24 * 60 * 60 * 1000))
         : null;
@@ -59,8 +65,10 @@ router.get('/discover', authenticateToken, async (req, res) => {
         ? [{
             mixtape_id: profile.mixtape_id,
             name: profile.mixtape_name,
-            bio: profile.mixtape_bio,
-            photo_url: profile.photo_url,
+            bio: profile.mixtape_bio, // Include the bio field
+            photo_url: profile.photo_url
+              ? `${process.env.BASE_URL}/${profile.photo_url}` // Construct full URL
+              : null,
             songs,
           }]
         : [];
@@ -70,8 +78,8 @@ router.get('/discover', authenticateToken, async (req, res) => {
         gender: profile.gender,
         profile_bio: profile.profile_bio,
         birthday: profile.birthday,
-        user_id: profile.user_id,
         age,
+        user_id: profile.user_id,
         mixtapes,
       };
     });
