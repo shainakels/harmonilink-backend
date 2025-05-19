@@ -30,10 +30,12 @@ router.get('/discover', authenticateToken, async (req, res) => {
         mixtapes.bio AS mixtape_bio,
         mixtapes.photo_url,
         GROUP_CONCAT(mixtape_songs.song_name) AS song_names,
-        GROUP_CONCAT(mixtape_songs.artist_name) AS artist_names
+        GROUP_CONCAT(mixtape_songs.artist_name) AS artist_names,
+        GROUP_CONCAT(mixtape_songs.preview_url) AS preview_urls,
+        GROUP_CONCAT(mixtape_songs.artwork_url) AS artwork_urls
       FROM user_profiles
       INNER JOIN users ON user_profiles.user_id = users.id
-      LEFT JOIN mixtapes ON user_profiles.user_id = mixtapes.user_id
+      LEFT JOIN mixtapes ON user_profiles.user_id = mixtapes.user_id AND mixtapes.source = 'onboarding'
       LEFT JOIN mixtape_songs ON mixtapes.id = mixtape_songs.mixtape_id
       WHERE users.id != ? 
         AND users.id NOT IN (
@@ -41,11 +43,21 @@ router.get('/discover', authenticateToken, async (req, res) => {
           FROM discarded 
           WHERE user_id = ?
         )
+        AND users.id NOT IN (
+          SELECT favorited_user_id 
+          FROM favorites 
+          WHERE user_id = ?
+        )
       GROUP BY users.id, mixtapes.id
       ORDER BY RAND()
       LIMIT 10
       `,
-      [req.user.id, req.user.id]
+      [req.user.id, req.user.id, req.user.id]
+    );
+
+    // Example: Only fetch mixtapes with source 'onboarding'
+    const [mixtapes] = await db.execute(
+      'SELECT * FROM mixtapes WHERE is_public = 1'
     );
 
     // Structure the response
@@ -58,6 +70,8 @@ router.get('/discover', authenticateToken, async (req, res) => {
         ? profile.song_names.split(',').map((songName, index) => ({
             song_name: songName,
             artist_name: profile.artist_names.split(',')[index],
+            preview_url: profile.preview_urls ? profile.preview_urls.split(',')[index] : null,
+            artwork_url: profile.artwork_urls ? profile.artwork_urls.split(',')[index] : null,
           }))
         : [];
 
@@ -65,9 +79,9 @@ router.get('/discover', authenticateToken, async (req, res) => {
         ? [{
             mixtape_id: profile.mixtape_id,
             name: profile.mixtape_name,
-            bio: profile.mixtape_bio, // Include the bio field
+            bio: profile.mixtape_bio, 
             photo_url: profile.photo_url
-              ? `${process.env.BASE_URL}/${profile.photo_url}` // Construct full URL
+              ? `${process.env.BASE_URL.replace(/\/$/, '')}/${profile.photo_url.replace(/^\/?/, '')}`
               : null,
             songs,
           }]
