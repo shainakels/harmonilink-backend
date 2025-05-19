@@ -16,7 +16,8 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path'); // Import path module
 const app = express();
-const createMixtapeRoute = require('./routes/create-mixtape');
+const createMixtapeRoutes = require('./routes/create-mixtape');
+const uploadRouter = require('./routes/upload');
 
 app.use(cors({
   origin: 'http://localhost:5173', // Replace with your frontend URL
@@ -26,9 +27,6 @@ app.use(cors({
 
 app.use(bodyParser.json());
 
-// Serve static files from the "uploads" directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 app.get('/', (req, res) => {
   res.send('Welcome to the Harmonilink API!');
 });
@@ -37,6 +35,7 @@ app.get('/', (req, res) => {
 app.use('/api', signupRoute);
 app.use('/api', loginRoute);
 app.use('/api', profileRoute); // Register profile route
+app.use('/api', createMixtapeRoutes);
 app.use('/api', mixtapeRoute);
 app.use('/api/auth', authRoute); // Register auth route
 app.use('/api/forgot-password', forgotPasswordRoute); // Register forgot-password route
@@ -44,9 +43,15 @@ app.use('/api/reset-password', resetPasswordRoute); // Register reset-password r
 app.use('/api', discoverRoute); // Register discover route
 app.use('/api', discardRoute); // Register discard route
 app.use('/api', favoritesRoute); // Register the favorites route
-app.use('/api', createMixtapeRoute); // Register mixtape route
 
-app.use(errorHandler); // Use error handler middleware
+
+// Serve uploads folder statically
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Other middleware/routes...
+app.use('/api/upload', require('./routes/upload')); // adjust path as needed
+
+
+const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV === 'production') {
   const options = {
@@ -54,11 +59,14 @@ if (process.env.NODE_ENV === 'production') {
     cert: fs.readFileSync('path/to/certificate.crt'),
   };
 
-  https.createServer(options, app).listen(3000, () => {
-    console.log('Server running on https://localhost:3000');
+  https.createServer(options, app).listen(PORT, () => {
+    console.log(`Server running on https://localhost:${PORT}`);
   });
 } else {
-  app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
+
+app.use(errorHandler);
+
