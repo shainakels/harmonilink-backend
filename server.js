@@ -18,6 +18,7 @@ const path = require('path'); // Import path module
 const app = express();
 const createMixtapeRoutes = require('./routes/create-mixtape');
 const uploadRouter = require('./routes/upload');
+const feedRoute = require('./routes/feed'); // Import feed route
 
 app.use(cors({
   origin: 'http://localhost:5173', // Replace with your frontend URL
@@ -43,6 +44,7 @@ app.use('/api/reset-password', resetPasswordRoute); // Register reset-password r
 app.use('/api', discoverRoute); // Register discover route
 app.use('/api', discardRoute); // Register discard route
 app.use('/api', favoritesRoute); // Register the favorites route
+app.use('/api', feedRoute);
 
 
 // Serve uploads folder statically
