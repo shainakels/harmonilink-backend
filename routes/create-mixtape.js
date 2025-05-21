@@ -54,38 +54,59 @@ router.post('/create-mixtape', authenticateToken, async (req, res) => {
 // Fetch all mixtapes for the logged-in user
 router.get('/mixtapes', authenticateToken, async (req, res) => {
   try {
+    // Fetch all mixtapes for the user
     const [mixtapes] = await db.execute(
       `
       SELECT 
         m.id AS mixtape_id,
         m.name,
         m.bio,
-        m.photo_url,
-        GROUP_CONCAT(s.song_name) AS song_names,
-        GROUP_CONCAT(s.artist_name) AS artist_names,
-        GROUP_CONCAT(s.preview_url) AS preview_urls,
-        GROUP_CONCAT(s.artwork_url) AS artwork_urls
+        m.photo_url
       FROM mixtapes m
-      LEFT JOIN mixtape_songs s ON m.id = s.mixtape_id
       WHERE m.user_id = ?
-      GROUP BY m.id
+      ORDER BY m.id DESC
       `,
       [req.user.id]
     );
 
+    // For each mixtape, fetch its songs
+    const mixtapeIds = mixtapes.map(m => m.mixtape_id);
+    let songsByMixtape = {};
+    if (mixtapeIds.length > 0) {
+      const [songs] = await db.execute(
+        `
+        SELECT 
+          mixtape_id,
+          song_name,
+          artist_name,
+          preview_url,
+          artwork_url
+        FROM mixtape_songs
+        WHERE mixtape_id IN (${mixtapeIds.map(() => '?').join(',')})
+        ORDER BY id ASC
+        `,
+        mixtapeIds
+      );
+      // Group songs by mixtape_id
+      songsByMixtape = songs.reduce((acc, song) => {
+        if (!acc[song.mixtape_id]) acc[song.mixtape_id] = [];
+        acc[song.mixtape_id].push({
+          name: song.song_name,
+          artist: song.artist_name,
+          preview_url: song.preview_url,
+          artwork_url: song.artwork_url,
+        });
+        return acc;
+      }, {});
+    }
+
+    // Format mixtapes with their songs
     const formattedMixtapes = mixtapes.map(mixtape => ({
       id: mixtape.mixtape_id,
       name: mixtape.name,
-      bio: mixtape.bio,
-      photo_url: mixtape.photo_url,
-      songs: mixtape.song_names
-        ? mixtape.song_names.split(',').map((songName, index) => ({
-            name: songName,
-            artist: mixtape.artist_names.split(',')[index],
-            preview_url: mixtape.preview_urls ? mixtape.preview_urls.split(',')[index] : null,
-            artwork_url: mixtape.artwork_urls ? mixtape.artwork_urls.split(',')[index] : null,
-          }))
-        : [],
+      description: mixtape.bio,
+      cover: mixtape.photo_url,
+      songs: songsByMixtape[mixtape.mixtape_id] || [],
     }));
 
     res.status(200).json(formattedMixtapes);
