@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -19,6 +21,8 @@ const app = express();
 const createMixtapeRoutes = require('./routes/create-mixtape');
 const uploadRouter = require('./routes/upload');
 const feedRoute = require('./routes/feed'); // Import feed route
+
+console.log("GMAIL PASS:", process.env.GMAIL_APP_PASSWORD);
 
 app.use(cors({
   origin: 'http://localhost:5173', // Replace with your frontend URL
@@ -48,10 +52,9 @@ app.use('/api', feedRoute);
 
 
 // Serve uploads folder statically
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use('/uploads', express.static('uploads'));
 // Other middleware/routes...
 app.use('/api/upload', require('./routes/upload')); // adjust path as needed
-
 
 const PORT = process.env.PORT || 3000;
 
