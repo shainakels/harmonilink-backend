@@ -38,8 +38,8 @@ router.post('/create-mixtape', authenticateToken, async (req, res) => {
           mixtapeId,
           song.name,
           song.artist,
-          song.preview_url || null,
-          song.artwork_url || null
+          song.preview_url,
+          song.artwork_url
         ]
       );
     }
