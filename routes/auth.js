@@ -70,13 +70,59 @@ router.post('/auth/forgot-password', async (req, res) => {
     });
 
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+    const userName = user[0].username || '';
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Password Reset Request',
-      html: `<p>You requested a password reset. Click the link below to reset your password:</p>
-             <a href="${resetLink}">${resetLink}</a>
-             <p>If you did not request this, please ignore this email.</p>`,
+      subject: 'Reset Your Harmonilink Password',
+      html: `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #f3e6f7 0%, #dbb4d7 100%); padding: 48px 0; min-height: 100vh;">
+  <tr>
+    <td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" border="0" style="background: #fff; border-radius: 20px; box-shadow: 0 6px 32px rgba(198,151,189,0.18); border: 2px solid #c697bd; padding: 0;">
+        <!-- Header Bar -->
+        <tr>
+          <td style="background: linear-gradient(90deg, #c697bd 0%, #dbb4d7 100%); border-radius: 20px 20px 0 0; padding: 32px 0 16px 0; text-align: center;">
+            <h2 style="color: #fff; font-family: 'Fira Code', Arial, monospace; margin: 0; font-size: 2rem; letter-spacing: 1px;">Harmonilink</h2>
+          </td>
+        </tr>
+        <!-- Main Content -->
+        <tr>
+          <td style="padding: 44px 40px 24px 40px; color: #322848; font-family: 'Fira Code', Arial, monospace; font-size: 17px;">
+            <strong style="font-size: 1.35rem;">Reset Your Password</strong>
+            <p style="margin: 24px 0 0 0; font-size: 1.1rem;">Hi${userName ? ' ' + userName : ' there'},</p>
+            <p style="margin: 14px 0 26px 0;">We received a request to reset your Harmonilink account password.<br>
+            Click the button below to set a new password:</p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetLink}" style="background: linear-gradient(90deg, #432775 0%, #dbb4d7 100%); color: #fff; text-decoration: none; padding: 18px 44px; border-radius: 12px; font-weight: bold; font-size: 19px; box-shadow: 0 2px 12px rgba(67,39,117,0.10); display: inline-block;">Reset Password</a>
+            </div>
+            <div style="background: #f8eafd; border-radius: 12px; padding: 16px 20px; font-size: 15px; color: #432775; margin: 28px 0 0 0; border: 1.5px solid #e0cbe6;">
+              If the button above doesn't work, copy and paste this link into your browser:<br>
+              <a href="${resetLink}" style="color: #1a73e8; word-break: break-all;">${resetLink}</a>
+            </div>
+            <p style="color: #666; font-size: 15px; margin: 28px 0 0 0;">
+              This link will expire in <b>1 hour</b>. If you did not request a password reset, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+        <!-- Divider -->
+        <tr>
+          <td style="padding: 0 40px;">
+            <hr style="border: none; border-top: 1.5px solid #dbb4d7; margin: 36px 0 0 0;" />
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background: #c697bd; color: #fff; font-family: 'Fira Code', Arial, monospace; font-size: 15px; text-align: center; border-radius: 0 0 20px 20px; padding: 22px 0 14px 0;">
+            Need help? Contact <a href="mailto:support@harmonilink.com" style="color: #fff; text-decoration: underline;">support@harmonilink.com</a><br>
+            <span style="color: #f3e6f7;">Â© 2024 Harmonilink. All rights reserved.</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+`,
     });
 
     res.status(200).json({ message: 'Password reset link sent to your email.' });
@@ -151,13 +197,59 @@ router.post('/forgot-password', async (req, res) => {
     });
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const userName = user[0].username || '';
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Password Reset Request',
-      html: `<p>You requested a password reset. Click the link below to reset your password:</p>
-             <a href="${resetLink}">${resetLink}</a>
-             <p>If you did not request this, please ignore this email.</p>`,
+      subject: 'Reset Your Harmonilink Password',
+      html: `
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #f3e6f7 0%, #dbb4d7 100%); padding: 48px 0; min-height: 100vh;">
+  <tr>
+    <td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" border="0" style="background: #fff; border-radius: 20px; box-shadow: 0 6px 32px rgba(198,151,189,0.18); border: 2px solid #c697bd; padding: 0;">
+        <!-- Header Bar -->
+        <tr>
+          <td style="background: linear-gradient(90deg, #c697bd 0%, #dbb4d7 100%); border-radius: 20px 20px 0 0; padding: 32px 0 16px 0; text-align: center;">
+            <h2 style="color: #fff; font-family: 'Fira Code', Arial, monospace; margin: 0; font-size: 2rem; letter-spacing: 1px;">Harmonilink</h2>
+          </td>
+        </tr>
+        <!-- Main Content -->
+        <tr>
+          <td style="padding: 44px 40px 24px 40px; color: #322848; font-family: 'Fira Code', Arial, monospace; font-size: 17px;">
+            <strong style="font-size: 1.35rem;">Reset Your Password</strong>
+            <p style="margin: 24px 0 0 0; font-size: 1.1rem;">Hi${userName ? ' ' + userName : ' there'},</p>
+            <p style="margin: 14px 0 26px 0;">We received a request to reset your Harmonilink account password.<br>
+            Click the button below to set a new password:</p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetLink}" style="background: linear-gradient(90deg, #432775 0%, #dbb4d7 100%); color: #fff; text-decoration: none; padding: 18px 44px; border-radius: 12px; font-weight: bold; font-size: 19px; box-shadow: 0 2px 12px rgba(67,39,117,0.10); display: inline-block;">Reset Password</a>
+            </div>
+            <div style="background: #f8eafd; border-radius: 12px; padding: 16px 20px; font-size: 15px; color: #432775; margin: 28px 0 0 0; border: 1.5px solid #e0cbe6;">
+              If the button above doesn't work, copy and paste this link into your browser:<br>
+              <a href="${resetLink}" style="color: #1a73e8; word-break: break-all;">${resetLink}</a>
+            </div>
+            <p style="color: #666; font-size: 15px; margin: 28px 0 0 0;">
+              This link will expire in <b>1 hour</b>. If you did not request a password reset, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+        <!-- Divider -->
+        <tr>
+          <td style="padding: 0 40px;">
+            <hr style="border: none; border-top: 1.5px solid #dbb4d7; margin: 36px 0 0 0;" />
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background: #c697bd; color: #fff; font-family: 'Fira Code', Arial, monospace; font-size: 15px; text-align: center; border-radius: 0 0 20px 20px; padding: 22px 0 14px 0;">
+            Need help? Contact <a href="mailto:support@harmonilink.com" style="color: #fff; text-decoration: underline;">support@harmonilink.com</a><br>
+            <span style="color: #f3e6f7;">Â© 2024 Harmonilink. All rights reserved.</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+`,
     });
 
     res.status(200).json({ message: 'Password reset link sent to your email.' });
