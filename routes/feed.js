@@ -10,7 +10,7 @@ function authenticateToken(req, res, next) {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Invalid token.' });
-    req.user = user; // Attach user info to the request
+    req.user = user; 
     next();
   });
 }
@@ -47,15 +47,29 @@ router.post('/feed', authenticateToken, async (req, res) => {
 // Fetch all polls with options and vote counts
 router.get('/feed', authenticateToken, async (req, res) => {
   try {
+    const [favoriteRows] = await db.execute(
+      'SELECT favorited_user_id FROM favorites WHERE user_id = ?',
+      [req.user.id]
+    );
+    const favoriteUserIds = favoriteRows.map(row => row.favorited_user_id);
+
+    if (favoriteUserIds.length === 0) {
+      favoriteUserIds.push(req.user.id); 
+    } else if (!favoriteUserIds.includes(req.user.id)) {
+      favoriteUserIds.push(req.user.id); 
+    }
+
+    const placeholders = favoriteUserIds.map(() => '?').join(',');
     const [polls] = await db.execute(
       `SELECT polls.id AS poll_id, polls.question, polls.user_id, polls.created_at, polls.poll_length_seconds, users.username, 
               user_profiles.gender, user_profiles.birthday, user_profiles.profile_image
        FROM polls
        JOIN users ON polls.user_id = users.id
        LEFT JOIN user_profiles ON users.id = user_profiles.user_id
-       ORDER BY polls.id DESC`
+       WHERE polls.user_id IN (${placeholders})
+       ORDER BY polls.id DESC`,
+      favoriteUserIds
     );
-    console.log('POLLS:', polls);
 
     let pollOptions = [];
     if (polls.length > 0) {
@@ -71,10 +85,8 @@ router.get('/feed', authenticateToken, async (req, res) => {
         pollIds
       );
       pollOptions = options;
-      console.log('OPTIONS:', pollOptions);
     }
 
-    // After fetching polls and pollOptions
     let userVotes = [];
     if (polls.length > 0) {
       const pollIds = polls.map(p => p.poll_id);
@@ -100,7 +112,7 @@ router.get('/feed', authenticateToken, async (req, res) => {
           birthday: poll.birthday,
           profile_image: poll.profile_image,
         },
-        user_vote_option_id: userVote ? userVote.option_id : null, // add this
+        user_vote_option_id: userVote ? userVote.option_id : null,
         options: (pollOptions || [])
           .filter(opt => opt.poll_id === poll.poll_id)
           .map(opt => ({
@@ -111,7 +123,6 @@ router.get('/feed', authenticateToken, async (req, res) => {
       };
     });
 
-    console.log('RESULT:', result);
     res.json(result);
   } catch (error) {
     console.error('Error fetching polls:', error);
