@@ -1,4 +1,6 @@
 require('dotenv').config();
+const nodemailer = require('nodemailer');
+const port = process.env.PORT || 3000;
 
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +10,6 @@ const loginRoute = require('./routes/login');
 const profileRoute = require('./routes/profile'); // Import profile route
 const mixtapeRoute = require('./routes/mixtape');
 const authRoute = require('./routes/auth'); // Import auth route
-const forgotPasswordRoute = require('./routes/forgot-password'); // Import forgot-password route
 const resetPasswordRoute = require('./routes/reset-password'); // Import reset-password route
 const discoverRoute = require('./routes/discover'); // Import discover route
 const discardRoute = require('./routes/discard'); // Import discard route
@@ -43,7 +44,6 @@ app.use('/api', profileRoute); // Register profile route
 app.use('/api', createMixtapeRoutes);
 app.use('/api', mixtapeRoute);
 app.use('/api/auth', authRoute); // Register auth route
-app.use('/api/forgot-password', forgotPasswordRoute); // Register forgot-password route
 app.use('/api/reset-password', resetPasswordRoute); // Register reset-password route
 app.use('/api', discoverRoute); // Register discover route
 app.use('/api', discardRoute); // Register discard route
@@ -53,8 +53,8 @@ app.use('/api', feedRoute);
 
 // Serve uploads folder statically
 app.use('/uploads', express.static('uploads'));
-// Other middleware/routes...
-app.use('/api/upload', require('./routes/upload')); // adjust path as needed
+
+app.use('/api/upload', require('./routes/upload')); 
 
 const PORT = process.env.PORT || 3000;
 
