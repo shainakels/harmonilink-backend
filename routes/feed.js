@@ -148,15 +148,21 @@ router.post('/feed/vote', authenticateToken, async (req, res) => {
         'UPDATE poll_votes SET option_id = ? WHERE poll_id = ? AND user_id = ?',
         [optionId, pollId, req.user.id]
       );
-      return res.status(200).json({ message: 'Vote updated.' });
     } else {
       // Insert new vote
       await db.execute(
-        'INSERT INTO poll_votes (poll_id, option_id, user_id) VALUES (?, ?, ?)',
+        'INSERT INTO poll_votes (poll_id, option_id, user_id, voted_at) VALUES (?, ?, ?, NOW())',
         [pollId, optionId, req.user.id]
       );
-      return res.status(201).json({ message: 'Vote recorded.' });
     }
+
+    // Count today's votes for this user
+    const [votesToday] = await db.execute(
+      'SELECT COUNT(*) as cnt FROM poll_votes WHERE user_id = ? AND DATE(voted_at) = CURDATE()',
+      [req.user.id]
+    );
+
+    return res.status(200).json({ message: 'Vote recorded.' });
   } catch (error) {
     console.error('Error voting:', error);
     res.status(500).json({ message: 'Failed to record vote.' });

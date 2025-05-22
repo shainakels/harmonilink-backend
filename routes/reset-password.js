@@ -11,9 +11,10 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const [user] = await db.query(
       'SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > ?',
-      [token, Date.now()]
+      [token, now]
     );
 
     if (user.length === 0) {
