@@ -1,22 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../config/db');
-const jwt = require('jsonwebtoken');
+const db = require("../config/db");
+const jwt = require("jsonwebtoken");
 
 // Middleware to verify JWT
 function authenticateToken(req, res, next) {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'Access token required.' });
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token)
+    return res.status(401).json({ message: "Access token required." });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token.' });
+    if (err) return res.status(403).json({ message: "Invalid token." });
     req.user = user; // Attach user info to the request
     next();
   });
 }
 
 // Discover endpoint
-router.get('/discover', authenticateToken, async (req, res) => {
+router.get("/discover", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.execute(
       `
@@ -57,34 +58,47 @@ router.get('/discover', authenticateToken, async (req, res) => {
 
     // Example: Only fetch mixtapes with source 'onboarding'
     const [mixtapes] = await db.execute(
-      'SELECT * FROM mixtapes WHERE is_public = 1'
+      "SELECT * FROM mixtapes WHERE is_public = 1"
     );
 
     // Structure the response
     const profileWithDetails = rows.map((profile) => {
       const age = profile.birthday
-        ? Math.floor((new Date() - new Date(profile.birthday)) / (365.25 * 24 * 60 * 60 * 1000))
+        ? Math.floor(
+            (new Date() - new Date(profile.birthday)) /
+              (365.25 * 24 * 60 * 60 * 1000)
+          )
         : null;
 
-      const songs = profile.song_names && profile.artist_names
-        ? profile.song_names.split(',').map((songName, index) => ({
-            song_name: songName,
-            artist_name: profile.artist_names.split(',')[index],
-            preview_url: profile.preview_urls ? profile.preview_urls.split(',')[index] : null,
-            artwork_url: profile.artwork_urls ? profile.artwork_urls.split(',')[index] : null,
-          }))
-        : [];
+      const songs =
+        profile.song_names && profile.artist_names
+          ? profile.song_names.split(",").map((songName, index) => ({
+              song_name: songName,
+              artist_name: profile.artist_names.split(",")[index],
+              preview_url: profile.preview_urls
+                ? profile.preview_urls.split(",")[index]
+                : null,
+              artwork_url: profile.artwork_urls
+                ? profile.artwork_urls.split(",")[index]
+                : null,
+            }))
+          : [];
 
       const mixtapes = profile.mixtape_id
-        ? [{
-            mixtape_id: profile.mixtape_id,
-            name: profile.mixtape_name,
-            bio: profile.mixtape_bio, 
-            photo_url: profile.photo_url
-              ? `${process.env.BASE_URL.replace(/\/$/, '')}/${profile.photo_url.replace(/^\/?/, '')}`
-              : null,
-            songs,
-          }]
+        ? [
+            {
+              mixtape_id: profile.mixtape_id,
+              name: profile.mixtape_name,
+              bio: profile.mixtape_bio,
+              photo_url: profile.photo_url
+                ? `${process.env.BASE_URL.replace(
+                    /\/$/,
+                    ""
+                  )}/${profile.photo_url.replace(/^\/?/, "")}`
+                : null,
+              songs,
+            },
+          ]
         : [];
 
       return {
@@ -100,8 +114,8 @@ router.get('/discover', authenticateToken, async (req, res) => {
 
     res.json(profileWithDetails);
   } catch (error) {
-    console.error('Error fetching profiles and mixtapes:', error);
-    res.status(500).json({ message: 'Failed to fetch profiles and mixtapes.' });
+    console.error("Error fetching profiles and mixtapes:", error);
+    res.status(500).json({ message: "Failed to fetch profiles and mixtapes." });
   }
 });
 

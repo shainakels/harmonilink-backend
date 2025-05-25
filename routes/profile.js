@@ -83,10 +83,10 @@ router.get('/mixtapes', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     // Fetch mixtapes for the user
     const [mixtapes] = await db.query(
-      `SELECT id, name, bio AS description, photo_url AS cover
-       FROM mixtapes
-       WHERE user_id = ?
-       ORDER BY id DESC`,
+      `SELECT id, name, bio AS description, photo_url AS cover, created_at
+      FROM mixtapes
+      WHERE user_id = ?
+      ORDER BY id DESC`,
       [userId]
     );
 
@@ -95,7 +95,7 @@ router.get('/mixtapes', authenticateToken, async (req, res) => {
     let songs = [];
     if (mixtapeIds.length > 0) {
       const [songRows] = await db.query(
-        `SELECT mixtape_id, song_name AS name, artist_name AS artist, preview_url AS url
+        `SELECT mixtape_id, song_name AS name, artist_name AS artist, preview_url, artwork_url
          FROM mixtape_songs
          WHERE mixtape_id IN (?)`,
         [mixtapeIds]
@@ -113,6 +113,48 @@ router.get('/mixtapes', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching mixtapes:', error);
     res.status(500).json({ message: 'Failed to fetch mixtapes.' });
+  }
+});
+
+router.post('/mixtapes', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { name, description, cover, songs } = req.body;
+
+  console.log('Received mixtape:', req.body);
+
+  if (!name || !Array.isArray(songs) || songs.length === 0) {
+    return res.status(400).json({ message: 'Name and at least one song are required.' });
+  }
+
+  try {
+    // Insert new mixtape
+    const [result] = await db.query(
+      `INSERT INTO mixtapes (user_id, name, bio, photo_url)
+       VALUES (?, ?, ?, ?)`,
+      [userId, name, description, cover]
+    );
+    const mixtapeId = result.insertId;
+
+    // Insert songs into mixtape_songs table
+    for (const song of songs) {
+      if (!song.name || !song.artist) continue; // skip invalid
+      await db.query(
+        `INSERT INTO mixtape_songs (mixtape_id, song_name, artist_name, preview_url, artwork_url)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          mixtapeId,
+          song.name,
+          song.artist,
+          song.preview_url || '',
+          song.artwork_url || '',
+        ]
+      );
+    }
+
+    res.status(201).json({ message: 'Mixtape created successfully.', mixtapeId });
+  } catch (error) {
+    console.error('Error creating mixtape:', error);
+    res.status(500).json({ message: 'Failed to create mixtape.' });
   }
 });
 
