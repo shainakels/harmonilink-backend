@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db'); 
 const authenticateToken = require('../middleware/authenticateToken'); 
+const axios = require('axios');
 
 router.post('/pfcustom', async (req, res) => {
   const { user_id, birthday, gender, bio } = req.body;
@@ -158,4 +159,181 @@ router.post('/mixtapes', authenticateToken, async (req, res) => {
   }
 });
 
+router.put('/mixtapes/:id', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const mixtapeId = req.params.id;
+  let { name, description, cover, songs } = req.body;
+
+  try {
+    if (!Array.isArray(songs)) {
+      return res.status(400).json({ message: 'Songs must be an array.' });
+    }
+
+    // Fetch current photo_url if cover is missing or empty
+    if (!cover) {
+      const [[row]] = await db.query(
+        `SELECT photo_url FROM mixtapes WHERE id = ? AND user_id = ?`,
+        [mixtapeId, userId]
+      );
+      cover = row ? row.photo_url : null;
+    }
+
+    // Update mixtape details
+    await db.query(
+      `UPDATE mixtapes SET name = ?, bio = ?, photo_url = ? WHERE id = ? AND user_id = ?`,
+      [
+        name ?? null,
+        description ?? null,
+        cover ?? null,
+        mixtapeId,
+        userId
+      ]
+    );
+
+    // Delete existing songs for the mixtape
+    await db.query(`DELETE FROM mixtape_songs WHERE mixtape_id = ?`, [mixtapeId]);
+
+    // Insert updated songs
+    for (const song of songs) {
+      // Use null for missing fields
+      const songName = song.name ?? null;
+      const artistName = song.artist ?? null;
+      const previewUrl = song.preview_url ?? null;
+      const artworkUrl = song.artwork_url ?? null;
+
+      if (!songName || !artistName) {
+        console.error('Invalid song:', song);
+        continue; // Skip invalid songs
+      }
+
+      await db.query(
+        `INSERT INTO mixtape_songs (mixtape_id, song_name, artist_name, preview_url, artwork_url)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          mixtapeId,
+          songName,
+          artistName,
+          previewUrl,
+          artworkUrl,
+        ]
+      );
+    }
+
+    res.status(200).json({ message: 'Mixtape updated successfully.' });
+  } catch (error) {
+    console.error('Error updating mixtape:', error);
+    res.status(500).json({ message: 'Failed to update mixtape.', error: error.message });
+  }
+});
+
+router.get('/itunes-search', async (req, res) => {
+  const { term } = req.query;
+  if (!term) return res.status(400).json({ message: 'Missing search term.' });
+  try {
+    const response = await axios.get('https://itunes.apple.com/search', {
+      params: {
+        term,
+        media: 'music',
+        limit: 10,
+      },
+    });
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ message: 'iTunes search failed.' });
+  }
+});
+
+// Add this after your other routes
+router.get('/polls', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // Fetch polls created by the user
+    const [polls] = await db.query(
+      `SELECT id, question, created_at, poll_length_seconds FROM polls WHERE user_id = ? ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    // Fetch options for these polls
+    const pollIds = polls.map(p => p.id);
+    let options = [];
+    if (pollIds.length > 0) {
+      const [optionRows] = await db.query(
+        `SELECT po.id, po.poll_id, po.option_text, 
+                COUNT(pv.id) AS votes
+         FROM poll_options po
+         LEFT JOIN poll_votes pv ON po.id = pv.option_id
+         WHERE po.poll_id IN (?)
+         GROUP BY po.id`,
+        [pollIds]
+      );
+      options = optionRows;
+    }
+
+    // Attach options to polls, format like feed.js
+    const pollsWithOptions = polls.map(poll => ({
+      ...poll,
+      options: options
+        .filter(opt => opt.poll_id === poll.id)
+        .map(opt => ({
+          id: opt.id,
+          text: opt.option_text,
+          votes: Number(opt.votes)
+        }))
+    }));
+
+    res.json(pollsWithOptions);
+  } catch (error) {
+    console.error('Error fetching polls:', error);
+    res.status(500).json({ message: 'Failed to fetch polls.' });
+  }
+});
+
+// Add DELETE endpoint for polls
+router.delete('/polls/:id', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const pollId = req.params.id;
+
+  try {
+    // First verify the poll belongs to the user
+    const [pollRows] = await db.query(
+      'SELECT id FROM polls WHERE id = ? AND user_id = ?',
+      [pollId, userId]
+    );
+
+    if (pollRows.length === 0) {
+      return res.status(404).json({ message: 'Poll not found or unauthorized.' });
+    }
+
+    // Start a transaction to ensure all related data is deleted
+    await db.query('START TRANSACTION');
+
+    try {
+      // Delete votes first (due to foreign key constraints)
+      await db.query(
+        `DELETE FROM poll_votes WHERE option_id IN 
+         (SELECT id FROM poll_options WHERE poll_id = ?)`,
+        [pollId]
+      );
+
+      // Delete poll options
+      await db.query('DELETE FROM poll_options WHERE poll_id = ?', [pollId]);
+
+      // Finally delete the poll itself
+      await db.query('DELETE FROM polls WHERE id = ?', [pollId]);
+
+      // Commit the transaction
+      await db.query('COMMIT');
+
+      res.json({ message: 'Poll deleted successfully.' });
+    } catch (error) {
+      // If anything fails, roll back the transaction
+      await db.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error deleting poll:', error);
+    res.status(500).json({ message: 'Failed to delete poll.' });
+  }
+});
+      
 module.exports = router;

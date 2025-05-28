@@ -130,15 +130,37 @@ router.put("/mixtapes/:id", authenticateToken, async (req, res) => {
   }
 
   try {
+    // First get the current mixtape data
+    const [currentMixtapes] = await db.execute(
+      "SELECT photo_url FROM mixtapes WHERE id = ? AND user_id = ?",
+      [mixtapeId, req.user.id]
+    );
+
+    if (currentMixtapes.length === 0) {
+      return res.status(404).json({ message: "Mixtape not found." });
+    }
+
+    const currentMixtape = currentMixtapes[0];
+
+    // Handle photo URL logic
+    let finalPhotoUrl = currentMixtape.photo_url; // Default to current photo
+    
+    // Update photo URL if a new one is provided
+    if (photoUrl) {
+      finalPhotoUrl = photoUrl;
+    }
+
     // Update mixtape info
     await db.execute(
       "UPDATE mixtapes SET name = ?, bio = ?, photo_url = ? WHERE id = ? AND user_id = ?",
-      [name, description, photoUrl, mixtapeId, req.user.id]
+      [name, description, finalPhotoUrl, mixtapeId, req.user.id]
     );
+
     // Remove old songs
     await db.execute("DELETE FROM mixtape_songs WHERE mixtape_id = ?", [
       mixtapeId,
     ]);
+
     // Insert new songs
     for (const song of songs) {
       await db.execute(
@@ -152,7 +174,11 @@ router.put("/mixtapes/:id", authenticateToken, async (req, res) => {
         ]
       );
     }
-    res.json({ message: "Mixtape updated successfully." });
+
+    res.json({ 
+      message: "Mixtape updated successfully.",
+      photoUrl: finalPhotoUrl // Send back the final photo URL
+    });
   } catch (error) {
     console.error("Error updating mixtape:", error);
     res.status(500).json({ message: "Failed to update mixtape." });
