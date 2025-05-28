@@ -7,7 +7,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const signupRoute = require('./routes/signup');
 const loginRoute = require('./routes/login');
-const profileRoute = require('./routes/profile'); // Import profile route
+const profileRoutes = require('./routes/profile'); // Import profile route
 const mixtapeRoute = require('./routes/mixtape');
 const authRoute = require('./routes/auth'); // Import auth route
 const resetPasswordRoute = require('./routes/reset-password'); // Import reset-password route
@@ -22,6 +22,7 @@ const app = express();
 const createMixtapeRoutes = require('./routes/create-mixtape');
 const uploadRouter = require('./routes/upload');
 const feedRoute = require('./routes/feed'); // Import feed route
+const searchRoutes = require('./routes/search');
 
 console.log("GMAIL PASS:", process.env.GMAIL_APP_PASSWORD);
 
@@ -40,7 +41,7 @@ app.get('/', (req, res) => {
 // Use routes under /api
 app.use('/api', signupRoute);
 app.use('/api', loginRoute);
-app.use('/api', profileRoute); // Register profile route
+app.use('/api', profileRoutes); // Register profile route
 app.use('/api', createMixtapeRoutes);
 app.use('/api', mixtapeRoute);
 app.use('/api/auth', authRoute); // Register auth route
@@ -49,10 +50,11 @@ app.use('/api', discoverRoute); // Register discover route
 app.use('/api', discardRoute); // Register discard route
 app.use('/api', favoritesRoute); // Register the favorites route
 app.use('/api', feedRoute);
+app.use('/api', searchRoutes);
 
 
 // Serve uploads folder statically
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/upload', require('./routes/upload')); 
 
