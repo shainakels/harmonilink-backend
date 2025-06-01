@@ -23,6 +23,7 @@ const createMixtapeRoutes = require('./routes/create-mixtape');
 const uploadRouter = require('./routes/upload');
 const feedRoute = require('./routes/feed'); // Import feed route
 const searchRoutes = require('./routes/search');
+const otpVerificationRoute = require('./routes/otp-verification'); // Add this line
 
 console.log("GMAIL PASS:", process.env.GMAIL_APP_PASSWORD);
 
@@ -41,16 +42,17 @@ app.get('/', (req, res) => {
 // Use routes under /api
 app.use('/api', signupRoute);
 app.use('/api', loginRoute);
-app.use('/api', profileRoutes); // Register profile route
+app.use('/api', profileRoutes);
 app.use('/api', createMixtapeRoutes);
 app.use('/api', mixtapeRoute);
-app.use('/api/auth', authRoute); // Register auth route
-app.use('/api/reset-password', resetPasswordRoute); // Register reset-password route
-app.use('/api', discoverRoute); // Register discover route
-app.use('/api', discardRoute); // Register discard route
-app.use('/api', favoritesRoute); // Register the favorites route
+app.use('/api/auth', authRoute);
+app.use('/api/reset-password', resetPasswordRoute);
+app.use('/api', discoverRoute);
+app.use('/api', discardRoute);
+app.use('/api', favoritesRoute);
 app.use('/api', feedRoute);
 app.use('/api', searchRoutes);
+app.use('/api', otpVerificationRoute); // Add this line
 
 
 // Serve uploads folder statically
@@ -76,4 +78,3 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use(errorHandler);
-
