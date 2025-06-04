@@ -63,7 +63,7 @@ router.post('/resend-otp', async (req, res) => {
       [otp, otpExpiry, email]
     );
 
-    // Send new OTP email
+    // Send new OTP email - FIX: Change createTransporter to createTransport
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {

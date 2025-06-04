@@ -4,58 +4,71 @@ const router = express.Router();
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: 'Too many login attempts. Please try again later.',
+});
+
+router.post('/login', loginLimiter, [
+  body('email').isEmail().normalizeEmail(),
+  body('password').escape(),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { email, password, rememberMe } = req.body;
+
+  if (!email || !password) {
+    return res.status(422).json({ message: 'Email and password are required.' });
+  }
 
   try {
-    // Get user with verification status
-    const [users] = await db.query(
-      'SELECT id, email, password, email_verified FROM users WHERE email = ?',
-      [email]
-    );
+    const [user] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (user.length === 0) {
+      return res.status(404).json({ message: 'User not registered.' });
+    }
 
-    if (users.length === 0) {
-      return res.status(404).json({ 
-        message: 'User not registered. Please sign up first.' 
+    const foundUser = user[0];
+
+    // CHECK EMAIL VERIFICATION STATUS - NEW SECURITY CHECK
+    if (!foundUser.email_verified) {
+      return res.status(403).json({ 
+        message: 'Please verify your email before logging in.',
+        requiresVerification: true,
+        email: email
       });
     }
 
-    const user = users[0];
-    const passwordValid = await bcrypt.compare(password, user.password);
-
-    if (!passwordValid) {
-      return res.status(400).json({ 
-        message: 'Invalid email or password.' 
-      });
+    const isPasswordValid = await bcrypt.compare(password, foundUser.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Invalid email or password.' });
     }
 
-    // Check email verification
-    if (!user.email_verified) {
-      return res.status(403).json({
-        status: 'unverified',
-        message: 'Please verify your email address to continue.',
-        email: user.email
-      });
-    }
+    const tokenExpiry = rememberMe ? '30d' : '1h';
+    const maxAgeMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
 
-    // Generate JWT token only if email is verified
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    const token = jwt.sign({ id: foundUser.id }, process.env.JWT_SECRET, { expiresIn: tokenExpiry });
 
-    res.json({
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only secure in production
+      sameSite: 'Strict',
+      maxAge: maxAgeMs,
+    });
+
+    res.status(200).json({
+      message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        username: user.username
-      }
+      user_id: foundUser.id,
+      onboarding_completed: foundUser.onboarding_completed
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'An error occurred during login.' });
+    next(error);
   }
 });
 
